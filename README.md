@@ -1,6 +1,6 @@
 ## 下载
 
-[命运轮盘 v1.0.0](releases/%E5%91%BD%E8%BF%90%E8%BD%AE%E7%9B%98-v1.0.0.apk)
+[命运轮盘 v1.0.0](https://github.com/Lostorderr/TurntableApp/releases)
 
 # 命运轮盘 (Turntable)
 
@@ -21,5 +21,3 @@
 支持 OpenAI 兼容 API（DeepSeek / OpenAI / Ollama 等）。
 
 设置页 → 填写 API Base URL、模型名称、API Key → 保存后即可使用 AI 功能。
-
-
