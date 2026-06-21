@@ -2,7 +2,6 @@
 
 [命运轮盘 v1.0.0](https://github.com/Lostorderr/TurntableApp/releases)
 
-# 命运轮盘 (Turntable)
 
 一款Android 互动转盘应用，支持 AI 智能生成转盘与流程。
 
