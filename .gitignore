@@ -1,0 +1,21 @@
+# Gradle
+/.gradle/
+/build/
+/app/build/
+
+# IDE
+/.idea/
+.idea/
+*.iml
+
+# Local configuration
+local.properties
+.claude/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keystore
+*.jks
+*.keystore
