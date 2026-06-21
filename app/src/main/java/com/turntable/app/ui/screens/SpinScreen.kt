@@ -549,17 +549,12 @@ private fun FlowSpinControls(
         val sessionComplete = session.status == 1
 
         if (sessionComplete) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = { viewModel.reSpinCurrentStage() }, modifier = Modifier.weight(1f), enabled = !isSpinning) {
-                    Text("重新旋转", fontSize = 14.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Button(onClick = { viewModel.reSpinCurrentStage() }, modifier = Modifier.weight(1f), enabled = !isSpinning) { Text("重新旋转", fontSize = 14.sp) }
+                    Button(onClick = { viewModel.resetFlowSession() }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)) { Text("重置", fontSize = 14.sp) }
                 }
-                Button(
-                    onClick = { viewModel.resetFlowSession() },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-                ) {
-                    Text("重置", fontSize = 14.sp)
-                }
+                Button(onClick = { viewModel.openSettlement() }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) { Text("进入结算", fontSize = 15.sp) }
             }
         } else if (!autoFlow) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {

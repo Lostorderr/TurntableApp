@@ -123,6 +123,63 @@ class TurntableViewModel(application: Application) : AndroidViewModel(applicatio
     fun openAiFlowGenerate() { _showAiFlowGenerate.value = true }
     fun closeAiFlowGenerate() { _showAiFlowGenerate.value = false }
 
+    // Flow settlement
+    private val _showSettlement = MutableStateFlow(false)
+    val showSettlement: StateFlow<Boolean> = _showSettlement.asStateFlow()
+    private val _settlementSummary = MutableStateFlow<String?>(null)
+    val settlementSummary: StateFlow<String?> = _settlementSummary.asStateFlow()
+    private val _aiSummarizing = MutableStateFlow(false)
+    val aiSummarizing: StateFlow<Boolean> = _aiSummarizing.asStateFlow()
+
+    fun openSettlement() { _showSettlement.value = true }
+    fun closeSettlement() { _showSettlement.value = false; _settlementSummary.value = null }
+
+    fun summarizeFlow() {
+        val config = _aiConfig.value
+        if (config.apiKey.isBlank()) { _showSettlement.value = false; _showSettings.value = true; toast("请先配置 API Key", "error"); return }
+        val history = _flowHistory.value; if (history.isEmpty()) return
+        val flowName = _selectedFlowPreview.value?.flow?.name ?: "流程"
+        val historyText = history.joinToString("\n") { (stage, result) ->
+            "【$stage】→ ${result.segmentName}${if (result.segmentDescription.isNotBlank()) "（${result.segmentDescription}）" else ""}"
+        }
+        viewModelScope.launch { _aiSummarizing.value = true
+            try { withContext(Dispatchers.IO) { AiService(config.apiKey, config.baseUrl, config.model).summarizeFlow(flowName, historyText) }.fold(onSuccess = { _settlementSummary.value = it }, onFailure = { toast("AI 总结失败: ${it.message}", "error") }) }
+            finally { _aiSummarizing.value = false } }
+    }
+
+    // AI flow editing
+    private val _showAiEditFlow = MutableStateFlow(false)
+    val showAiEditFlow: StateFlow<Boolean> = _showAiEditFlow.asStateFlow()
+    fun openAiEditFlow() { _showAiEditFlow.value = true }
+    fun closeAiEditFlow() { _showAiEditFlow.value = false }
+
+    fun editFlowByAi(instructions: String) {
+        val config = _aiConfig.value
+        if (config.apiKey.isBlank()) { _showAiEditFlow.value = false; _showSettings.value = true; toast("请先配置 API Key", "error"); return }
+        val detail = _flowDetail.value ?: return
+        val turntableMap = turntables.value.associate { it.turntable.id to it.turntable.name }
+        val sortedStages = detail.stages.sortedBy { it.stageOrder }
+        val currentJson = buildString {
+            appendLine("{"); appendLine("  \"name\": \"${detail.flow.name}\","); appendLine("  \"description\": \"${detail.flow.description}\",")
+            appendLine("  \"stages\": [")
+            sortedStages.forEachIndexed { i, s -> appendLine("    { \"stageName\": \"${s.stageName}\", \"turntableName\": \"${turntableMap[s.turntableId] ?: "未知"}\" }${if (i < sortedStages.size - 1) "," else ""}") }
+            appendLine("  ]"); append("}")
+        }
+        viewModelScope.launch { _aiGenerating.value = true
+            try {
+                val flowId = detail.flow.id
+                withContext(Dispatchers.IO) { AiService(config.apiKey, config.baseUrl, config.model).editFlow(currentJson, instructions) }.fold(
+                    onSuccess = { fd ->
+                        repository.updateFlowInfo(flowId, fd.name, fd.description)
+                        val ttByName = turntableMap.entries.associate { (id, name) -> name to id }
+                        val newStages = fd.stages.mapIndexed { idx, sd -> TurntableFlowStageEntity(flowId = flowId, turntableId = ttByName[sd.turntable.name] ?: (sortedStages.getOrNull(idx)?.turntableId ?: turntableMap.keys.firstOrNull() ?: 0L), stageName = sd.stageName, stageOrder = idx) }
+                        repository.replaceFlowStages(flowId, newStages)
+                        _flowDetail.value = repository.getFlow(flowId)
+                        _showAiEditFlow.value = false; toast("AI 已编辑流程", "success")
+                    }, onFailure = { toast("AI 编辑失败: ${it.message}", "error") })
+            } finally { _aiGenerating.value = false } }
+    }
+
     fun openAiFlowGenerateOrSettings() {
         if (_aiConfig.value.apiKey.isNotBlank()) {
             _showAiFlowGenerate.value = true
@@ -522,10 +579,10 @@ class TurntableViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun deleteFlow(id: Long) {
+    fun deleteFlow(id: Long, deleteTurntables: Boolean = false) {
         viewModelScope.launch {
-            repository.deleteFlow(id)
-            toast("已删除", "success")
+            if (deleteTurntables) { repository.deleteFlowWithTurntables(id); toast("流程及转盘已删除", "success") }
+            else { repository.deleteFlow(id); toast("流程已删除", "success") }
         }
     }
 

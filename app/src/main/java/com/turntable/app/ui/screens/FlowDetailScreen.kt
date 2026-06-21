@@ -1,12 +1,11 @@
 package com.turntable.app.ui.screens
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,6 +16,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -122,10 +122,28 @@ fun FlowDetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    TextButton(onClick = { editingName = true }) {
-                        Text("编辑名称和描述")
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(onClick = { editingName = true }) { Text("编辑") }
+                        TextButton(onClick = { viewModel.openAiEditFlow() }) { Text("AI 编辑", color = MaterialTheme.colorScheme.primary) }
                     }
                 }
+            }
+            if (viewModel.showAiEditFlow.collectAsState().value) {
+                var editInstruction by remember { mutableStateOf("") }
+                val aiGenerating by viewModel.aiGenerating.collectAsState()
+                AlertDialog(
+                    onDismissRequest = { viewModel.closeAiEditFlow() }, title = { Text("AI 编辑流程") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("描述你想要的修改，例如：", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("· 把第一阶段和第二阶段顺序调换 / 改名为「周末大冒险」/ 删除最后一个阶段", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            OutlinedTextField(value = editInstruction, onValueChange = { editInstruction = it }, label = { Text("修改指令") }, modifier = Modifier.fillMaxWidth(), minLines = 2, enabled = !aiGenerating)
+                            if (aiGenerating) Row(verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(modifier = Modifier.width(8.dp)); Text("AI 正在编辑…", fontSize = 14.sp) }
+                        }
+                    },
+                    confirmButton = { Button(onClick = { viewModel.editFlowByAi(editInstruction) }, enabled = editInstruction.isNotBlank() && !aiGenerating) { Text("执行") } },
+                    dismissButton = { TextButton(onClick = { viewModel.closeAiEditFlow() }) { Text("取消") } }
+                )
             }
         }
 
@@ -142,197 +160,73 @@ fun FlowDetailScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
         )
 
-        // Stage list
+        // Stage list — disable scroll during drag
+        val scrollState = rememberScrollState()
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
+            modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(scrollState, enabled = draggedIndex == null).padding(horizontal = 16.dp)
         ) {
             localStages.forEachIndexed { index, stage ->
                 val isDragged = draggedIndex == index
-                val elevation by animateDpAsState(
-                    if (isDragged) 8.dp else 0.dp,
-                    label = "elevation"
-                )
 
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .zIndex(if (isDragged) 1f else 0f)
-                        .graphicsLayer {
-                            if (isDragged) {
-                                translationY = dragOffsetY
-                                shadowElevation = 8f
-                            }
-                        }
-                        .pointerInput(stage.id) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = {
-                                    draggedIndex = index
-                                    dragOffsetY = 0f
-                                },
-                                onDrag = { change, offset ->
-                                    change.consume()
-                                    dragOffsetY += offset.y
-
-                                    // Reorder locally as we drag
-                                    val moveSteps = (dragOffsetY / itemHeightPx).roundToInt()
-                                    val targetIndex = (index + moveSteps).coerceIn(0, localStages.size - 1)
-
-                                    if (targetIndex != index && draggedIndex == index) {
-                                        val newList = localStages.toMutableList()
-                                        val item = newList.removeAt(index)
-                                        newList.add(targetIndex, item)
-                                        localStages = newList
-                                        draggedIndex = targetIndex
-                                        // Adjust offset since the item moved in the list
-                                        dragOffsetY -= moveSteps * itemHeightPx
-                                    }
-                                },
-                                onDragEnd = {
-                                    draggedIndex = null
-                                    dragOffsetY = 0f
-                                    // Commit the new order
-                                    viewModel.reorderStages(flowId, localStages)
-                                },
-                                onDragCancel = {
-                                    draggedIndex = null
-                                    dragOffsetY = 0f
-                                    // Revert to server state
-                                    localStages = currentStages
-                                }
-                            )
-                        },
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isDragged)
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                        else MaterialTheme.colorScheme.background
-                    )
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        .zIndex(if (isDragged) 999f else 0f)
+                        .graphicsLayer { if (isDragged) { translationY = dragOffsetY; shadowElevation = 8f } },
+                    colors = CardDefaults.cardColors(containerColor = if (isDragged) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f) else MaterialTheme.colorScheme.surface)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Order number badge
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "${index + 1}",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        // Drag handle — manual gesture to prevent scroll interception
+                        Box(modifier = Modifier.padding(4.dp).pointerInput(stage.id) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val down = awaitPointerEvent(); val dc = down.changes.firstOrNull() ?: continue
+                                    if (!dc.pressed) continue
+                                    val startTime = System.currentTimeMillis(); var isDragging = false
+                                    while (true) {
+                                        val event = awaitPointerEvent(); val c = event.changes.firstOrNull() ?: break
+                                        c.consume(); if (!c.pressed) break
+                                        if (!isDragging && System.currentTimeMillis() - startTime > 300) { isDragging = true; draggedIndex = index; dragOffsetY = 0f }
+                                        if (isDragging) {
+                                            dragOffsetY += c.position.y - c.previousPosition.y
+                                            val steps = (dragOffsetY / itemHeightPx).roundToInt()
+                                            val ti = (index + steps).coerceIn(0, localStages.size - 1)
+                                            if (ti != index && draggedIndex == index) { val nl = localStages.toMutableList(); val item = nl.removeAt(index); nl.add(ti, item); localStages = nl; draggedIndex = ti; dragOffsetY -= steps * itemHeightPx }
+                                        }
+                                    }
+                                    if (isDragging) viewModel.reorderStages(flowId, localStages)
+                                    draggedIndex = null; dragOffsetY = 0f
+                                }
+                            }
+                        }) { Text("⋮⋮", fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 4.dp)) }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        // Order badge
+                        Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) { Text("${index + 1}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary) }
+                        Spacer(modifier = Modifier.width(10.dp))
 
+                        // Name + turntable
+                        var editStageName by remember { mutableStateOf(false) }
+                        var stageNameText by remember(stage) { mutableStateOf(stage.stageName) }
                         Column(modifier = Modifier.weight(1f)) {
-                            var editStageName by remember { mutableStateOf(false) }
-                            var stageNameText by remember(stage) { mutableStateOf(stage.stageName) }
                             if (editStageName) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    OutlinedTextField(
-                                        value = stageNameText,
-                                        onValueChange = { stageNameText = it },
-                                        modifier = Modifier.weight(1f),
-                                        singleLine = true,
-                                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
-                                    )
-                                    IconButton(onClick = {
-                                        viewModel.updateStageName(stage, stageNameText)
-                                        editStageName = false
-                                    }) { Text("✓", fontSize = 16.sp, color = MaterialTheme.colorScheme.primary) }
-                                    IconButton(onClick = { editStageName = false }) { Text("✕", fontSize = 14.sp) }
-                                }
-                            } else {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.clickable { editStageName = true }
-                                ) {
-                                    Text(stage.stageName, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    Text(" ✎", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            Text(
-                                "转盘: ${turntableMap[stage.turntableId] ?: "未知"}",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                                Row(verticalAlignment = Alignment.CenterVertically) { OutlinedTextField(value = stageNameText, onValueChange = { stageNameText = it }, modifier = Modifier.weight(1f), singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)); TextButton(onClick = { viewModel.updateStageName(stage, stageNameText); editStageName = false }) { Text("✓", color = MaterialTheme.colorScheme.primary) }; TextButton(onClick = { editStageName = false }) { Text("✕") } }
+                            } else { Text(stage.stageName, fontWeight = FontWeight.Medium, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.clickable { editStageName = true }) }
+                            Text(turntableMap[stage.turntableId] ?: "未知", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
 
-                        // Up/Down buttons
-                        Column {
-                            IconButton(
-                                onClick = {
-                                    viewModel.moveStageUp(flowId, stage.stageOrder)
-                                },
-                                modifier = Modifier.size(28.dp),
-                                enabled = index > 0
-                            ) {
-                                Text("▲", fontSize = 14.sp)
-                            }
-                            IconButton(
-                                onClick = {
-                                    viewModel.moveStageDown(flowId, stage.stageOrder)
-                                },
-                                modifier = Modifier.size(28.dp),
-                                enabled = index < localStages.size - 1
-                            ) {
-                                Text("▼", fontSize = 14.sp)
-                            }
-                        }
+                        // Up/Down
+                        IconButton(onClick = { viewModel.moveStageUp(flowId, stage.stageOrder) }, modifier = Modifier.size(28.dp), enabled = index > 0) { Text("▲", fontSize = 12.sp) }
+                        IconButton(onClick = { viewModel.moveStageDown(flowId, stage.stageOrder) }, modifier = Modifier.size(28.dp), enabled = index < localStages.size - 1) { Text("▼", fontSize = 12.sp) }
 
-                        // Edit button - navigate to turntable edit
-                        IconButton(
-                            onClick = {
-                                viewModel.openEditWheelForm(stage.turntableId)
-                                viewModel.setTab(0)
-                            },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Text("✎", fontSize = 16.sp, color = MaterialTheme.colorScheme.primary)
-                        }
+                        // Edit turntable
+                        TextButton(onClick = { viewModel.openEditWheelForm(stage.turntableId); viewModel.setTab(0) }) { Text("编辑", fontSize = 12.sp) }
 
-                        // Delete button
+                        // Delete
                         var showDeleteConfirm by remember { mutableStateOf(false) }
-                        IconButton(
-                            onClick = { showDeleteConfirm = true },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Text("✕", fontSize = 18.sp, color = MaterialTheme.colorScheme.error)
-                        }
-
-                        if (showDeleteConfirm) {
-                            AlertDialog(
-                                onDismissRequest = { showDeleteConfirm = false },
-                                title = { Text("确认删除") },
-                                text = { Text("确定要移除阶段「${stage.stageName}」吗？") },
-                                confirmButton = {
-                                    TextButton(onClick = {
-                                        viewModel.removeStageFromFlow(stage)
-                                        showDeleteConfirm = false
-                                    }) {
-                                        Text("删除", color = MaterialTheme.colorScheme.error)
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { showDeleteConfirm = false }) {
-                                        Text("取消")
-                                    }
-                                }
-                            )
-                        }
-
+                        TextButton(onClick = { showDeleteConfirm = true }) { Text("删除", fontSize = 12.sp, color = MaterialTheme.colorScheme.error) }
+                        if (showDeleteConfirm) AlertDialog(
+                            onDismissRequest = { showDeleteConfirm = false }, title = { Text("确认删除") }, text = { Text("确定要移除阶段「${stage.stageName}」吗？") },
+                            confirmButton = { TextButton(onClick = { viewModel.removeStageFromFlow(stage); showDeleteConfirm = false }) { Text("删除", color = MaterialTheme.colorScheme.error) } },
+                            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") } })
                     }
                 }
             }

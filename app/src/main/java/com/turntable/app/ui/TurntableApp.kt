@@ -22,6 +22,7 @@ import com.turntable.app.ui.screens.SelectorScreen
 import com.turntable.app.ui.screens.SettingsScreen
 import com.turntable.app.ui.screens.FlowManageScreen
 import com.turntable.app.ui.screens.FlowSettingsPage
+import com.turntable.app.ui.screens.FlowSettlementScreen
 import com.turntable.app.ui.screens.SpinScreen
 import com.turntable.app.ui.screens.WheelEditScreen
 import com.turntable.app.ui.screens.WheelManageScreen
@@ -64,8 +65,10 @@ fun TurntableApp(viewModel: TurntableViewModel) {
     val isSelector = showSelector
     val isAiGenerate = showAiGenerate
     val isAiFlowGenerate = showAiFlowGenerate
+    val showSettlement by viewModel.showSettlement.collectAsState()
+    val isSettlement = showSettlement
     val isConfigMode = currentTab != 2
-    val showBackButton = isConfigMode || isFlowDetail || isFlowSettings || isWheelForm || isSettings || isSelector || isAiGenerate || isAiFlowGenerate
+    val showBackButton = isConfigMode || isFlowDetail || isFlowSettings || isWheelForm || isSettings || isSelector || isAiGenerate || isAiFlowGenerate || isSettlement
 
     // System back button: go back through overlays, then to spin screen, then exit
     val canGoBack = showBackButton
@@ -76,6 +79,7 @@ fun TurntableApp(viewModel: TurntableViewModel) {
             isWheelForm -> viewModel.closeWheelForm()
             isAiGenerate -> viewModel.closeAiGenerate()
             isAiFlowGenerate -> viewModel.closeAiFlowGenerate()
+            isSettlement -> viewModel.closeSettlement()
             isFlowSettings -> viewModel.closeFlowSettings()
             isFlowDetail -> viewModel.closeFlowDetail()
             isConfigMode -> viewModel.setTab(2)
@@ -103,6 +107,7 @@ fun TurntableApp(viewModel: TurntableViewModel) {
                             else if (isFlowDetail) viewModel.closeFlowDetail()
                             else if (isAiGenerate) viewModel.closeAiGenerate()
                             else if (isAiFlowGenerate) viewModel.closeAiFlowGenerate()
+                            else if (isSettlement) viewModel.closeSettlement()
                             else viewModel.setTab(2)
                         }) {
                             Text("← 返回", fontSize = 14.sp,
@@ -117,6 +122,7 @@ fun TurntableApp(viewModel: TurntableViewModel) {
                             isFlowDetail -> "流程详情"
                             isAiGenerate -> "AI 生成转盘"
                             isAiFlowGenerate -> "AI 生成流程"
+                            isSettlement -> "流程结算"
                             currentTab == 0 -> "转盘管理"
                             currentTab == 1 -> "流程管理"
                             else -> ""
@@ -194,6 +200,8 @@ fun TurntableApp(viewModel: TurntableViewModel) {
                     AiGenerateDialog(viewModel)
                 } else if (isAiFlowGenerate) {
                     AiFlowGenerateDialog(viewModel)
+                } else if (isSettlement) {
+                    FlowSettlementScreen(viewModel)
                 } else if (isFlowSettings) {
                     FlowSettingsPage(viewModel)
                 } else if (isFlowDetail) {

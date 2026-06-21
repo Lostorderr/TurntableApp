@@ -98,6 +98,16 @@ class TurntableRepository(private val dao: TurntableDao) {
         dao.deleteFlow(entity)
     }
 
+    suspend fun deleteFlowWithTurntables(id: Long) {
+        val flow = dao.getFlowWithStages(id) ?: return
+        for (stage in flow.stages) {
+            val tt = dao.getTurntableById(stage.turntableId)
+            if (tt != null) { dao.deleteSegmentsByTurntableId(tt.id); dao.deleteTurntable(tt) }
+        }
+        dao.deleteStagesByFlowId(id)
+        dao.deleteFlow(flow.flow)
+    }
+
     suspend fun addStageToFlow(flowId: Long, turntableId: Long, stageName: String) {
         val stages = dao.getStagesByFlowId(flowId)
         val nextOrder = (stages.maxOfOrNull { it.stageOrder } ?: -1) + 1
@@ -127,6 +137,11 @@ class TurntableRepository(private val dao: TurntableDao) {
                 dao.updateStage(stage.copy(stageOrder = index))
             }
         }
+    }
+
+    suspend fun replaceFlowStages(flowId: Long, stages: List<TurntableFlowStageEntity>) {
+        dao.deleteStagesByFlowId(flowId)
+        dao.insertStages(stages.mapIndexed { i, s -> s.copy(id = 0, flowId = flowId, stageOrder = i) })
     }
 
     suspend fun swapStagesOrder(flowId: Long, stageOrder: Int, direction: Int) {

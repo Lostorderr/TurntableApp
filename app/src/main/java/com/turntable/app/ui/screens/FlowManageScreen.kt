@@ -58,11 +58,24 @@ fun FlowManageScreen(viewModel: TurntableViewModel) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(flows, key = { it.flow.id }) { flow ->
-                    FlowCard(
-                        flow = flow,
-                        onClick = { viewModel.openFlowDetail(flow.flow.id) },
-                        onDelete = { viewModel.deleteFlow(flow.flow.id) }
-                    )
+                    var showDelDlg by remember { mutableStateOf(false) }
+                    var showDelConfirm by remember { mutableStateOf(false) }
+                    FlowCard(flow = flow, onClick = { viewModel.openFlowDetail(flow.flow.id) }, onDelete = { showDelDlg = true })
+                    if (showDelDlg) AlertDialog(
+                        onDismissRequest = { showDelDlg = false }, title = { Text("删除流程") },
+                        text = { Text("是否将流程「${flow.flow.name}」中的转盘一同删除？") },
+                        confirmButton = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = { showDelDlg = false; viewModel.deleteFlow(flow.flow.id) }) { Text("仅删流程") }
+                                Button(onClick = { showDelDlg = false; showDelConfirm = true }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("一并删除") }
+                            }
+                        },
+                        dismissButton = { TextButton(onClick = { showDelDlg = false }) { Text("取消") } })
+                    if (showDelConfirm) AlertDialog(
+                        onDismissRequest = { showDelConfirm = false }, title = { Text("二次确认") },
+                        text = { Text("确定要删除流程「${flow.flow.name}」及其所有关联转盘吗？此操作不可撤销。") },
+                        confirmButton = { TextButton(onClick = { showDelConfirm = false }) { Text("取消") } },
+                        dismissButton = { Button(onClick = { showDelConfirm = false; viewModel.deleteFlow(flow.flow.id, deleteTurntables = true) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) { Text("确定删除") } })
                 }
             }
         }
