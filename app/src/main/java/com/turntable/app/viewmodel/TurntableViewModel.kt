@@ -215,7 +215,7 @@ class TurntableViewModel(application: Application) : AndroidViewModel(applicatio
                                         turntableId = 0,
                                         name = seg.name,
                                         description = seg.description,
-                                        weight = seg.weight.coerceIn(1, 10)
+                                        weight = seg.weight.coerceIn(1, 100)
                                     )
                                 },
                                 boxId = boxId
@@ -263,7 +263,7 @@ class TurntableViewModel(application: Application) : AndroidViewModel(applicatio
                                 turntableId = 0,
                                 name = seg.name,
                                 description = seg.description,
-                                weight = seg.weight.coerceIn(1, 10)
+                                weight = seg.weight.coerceIn(1, 100)
                             )
                         }
                         repository.createTurntable(data.name, data.description, segments)

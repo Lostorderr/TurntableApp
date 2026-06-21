@@ -165,6 +165,22 @@ fun FlowDetailScreen(
         Column(
             modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(scrollState, enabled = draggedIndex == null).padding(horizontal = 16.dp)
         ) {
+            var stageNameDlg by remember { mutableStateOf<TurntableFlowStageEntity?>(null) }
+            var dlgText by remember { mutableStateOf("") }
+
+            // Stage name edit dialog
+            if (stageNameDlg != null) {
+                AlertDialog(
+                    onDismissRequest = { stageNameDlg = null },
+                    title = { Text("重命名阶段") },
+                    text = { OutlinedTextField(value = dlgText, onValueChange = { dlgText = it }, label = { Text("阶段名称") }, singleLine = true) },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.updateStageName(stageNameDlg!!, dlgText); stageNameDlg = null }) { Text("保存") }
+                    },
+                    dismissButton = { TextButton(onClick = { stageNameDlg = null }) { Text("取消") } }
+                )
+            }
+
             localStages.forEachIndexed { index, stage ->
                 val isDragged = draggedIndex == index
 
@@ -204,12 +220,8 @@ fun FlowDetailScreen(
                         Spacer(modifier = Modifier.width(10.dp))
 
                         // Name + turntable
-                        var editStageName by remember { mutableStateOf(false) }
-                        var stageNameText by remember(stage) { mutableStateOf(stage.stageName) }
                         Column(modifier = Modifier.weight(1f)) {
-                            if (editStageName) {
-                                Row(verticalAlignment = Alignment.CenterVertically) { OutlinedTextField(value = stageNameText, onValueChange = { stageNameText = it }, modifier = Modifier.weight(1f), singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)); TextButton(onClick = { viewModel.updateStageName(stage, stageNameText); editStageName = false }) { Text("✓", color = MaterialTheme.colorScheme.primary) }; TextButton(onClick = { editStageName = false }) { Text("✕") } }
-                            } else { Text(stage.stageName, fontWeight = FontWeight.Medium, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.clickable { editStageName = true }) }
+                            Text(stage.stageName, fontWeight = FontWeight.Medium, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.clickable { stageNameDlg = stage; dlgText = stage.stageName })
                             Text(turntableMap[stage.turntableId] ?: "未知", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
 

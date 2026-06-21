@@ -72,13 +72,13 @@ class AiService(
         val segmentsJson = json.optJSONArray("segments")
             ?: throw IllegalStateException("AI response missing segments array")
         val segments = mutableListOf<SegmentData>()
-        for (i in 0 until minOf(segmentsJson.length(), 20)) {
+        for (i in 0 until segmentsJson.length()) {
             val seg = segmentsJson.getJSONObject(i)
             segments.add(
                 SegmentData(
                     name = seg.optString("name", "").trim(),
                     description = seg.optString("description", "").trim(),
-                    weight = seg.optInt("weight", 1).coerceIn(1, 10)
+                    weight = seg.optInt("weight", 1).coerceIn(1, 100)
                 )
             )
         }
@@ -138,17 +138,17 @@ class AiService(
             ?: throw IllegalStateException("AI response missing stages array")
 
         val stages = mutableListOf<FlowStageData>()
-        for (i in 0 until minOf(stagesJson.length(), 5)) {
+        for (i in 0 until stagesJson.length()) {
             val stageJson = stagesJson.getJSONObject(i)
             val ttJson = stageJson.getJSONObject("turntable")
             val segsJson = ttJson.getJSONArray("segments")
             val segments = mutableListOf<SegmentData>()
-            for (j in 0 until minOf(segsJson.length(), 10)) {
+            for (j in 0 until segsJson.length()) {
                 val sj = segsJson.getJSONObject(j)
                 segments.add(SegmentData(
                     name = sj.optString("name", "").trim(),
                     description = sj.optString("description", "").trim(),
-                    weight = sj.optInt("weight", 1).coerceIn(1, 10)
+                    weight = sj.optInt("weight", 1).coerceIn(1, 100)
                 ))
             }
             stages.add(FlowStageData(
@@ -243,7 +243,7 @@ class AiService(
   ]
 }
 要求：
-- 至少2个选项，最多20个选项
+- 选项数量根据用户描述灵活决定，至少2个，上不封顶
 - 权重根据现实概率合理分配
 - 名称和描述使用中文
         """.trimIndent()
@@ -271,10 +271,13 @@ class AiService(
   ]
 }
 要求：
-- 至少2个阶段，最多5个阶段
-- 每个转盘至少2个选项，最多10个选项
+- 阶段数量和选项数量根据用户描述灵活决定。需求丰富则多生成，需求模糊则精简
+- 每个转盘至少2个选项
 - 权重根据现实概率合理分配
+- 流程名称和描述需要原创，不要直接复制用户输入
+- 转盘名称和描述也需要原创生成
 - 名称和描述使用中文
+- 【重要】每个转盘只关注一个维度/属性。能拆就拆，不要合并。除非用户明确要求混在一起。
         """.trimIndent()
 
         private val SUMMARY_SYSTEM_PROMPT = """
